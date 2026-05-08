@@ -1,0 +1,23 @@
+Contenido general para paper
+----------------------------------
+Estado del arte general: 
+Modelado de emociones con grandes modelos de lenguaje (Documento regular invitado)  : https://arxiv.org/html/2404.13071v2
+-Obeservaciones:
+1. La rueda de las emociones de Plutchik 
+Large Language Models Understand and Can be Enhanced by Emotional Stimuli : https://arxiv.org/abs/2307.11760
+-Obeservaciones:
+1. No justificaron los pronts 
+----------------------------------
+Experimentos a probar:
+1.0 Sensibilidad emocional directa 
+2.0 Intensidad emocional
+3.0 Consistencia semántica
+4.0 Conflicto emoción vs instrucción
+5.0 Transferencia emocional
+6.0 Memoria emocional
+7.0 Señales contradictorias
+---------------------------------
+1.0 Sensibilidad emocional directa 
+1.1 paper relacionados:
+GoEmotions: A Dataset of Fine-Grained Emotions : paper de emociones y la neutroalidad
+Towards Empathetic Open-domain Conversation Models: a New Benchmark and Dataset : paper de diferentes emociones ocupadas para el experimento
