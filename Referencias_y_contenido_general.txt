@@ -21,3 +21,16 @@ Experimentos a probar:
 1.1 paper relacionados:
 GoEmotions: A Dataset of Fine-Grained Emotions : paper de emociones y la neutroalidad
 Towards Empathetic Open-domain Conversation Models: a New Benchmark and Dataset : paper de diferentes emociones ocupadas para el experimento
+ejemplo: ansiedad,frustracion
+Should We Respect LLMs? A Cross-Lingual Study on the Influence of Prompt Politeness on LLM Performance : paper de ampatia 
+1.2 modelos ya probados:
+"llama3" 8b
+"mistral" 8b
+"phi3" 8b
+"qwen" 14b
+1.2.1 Posibles modelos a probar 
+"Nemotron" 70b Fallo 
+"Nemotron3 : 33b" 33b
+"gemma4:31b" 31b
+"ministral-3:14b" 14b
+

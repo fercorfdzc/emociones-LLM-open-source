@@ -17,12 +17,7 @@ import time
 import os
 import sys
 
-# ─────────────────────────────────────────────
-# CONFIGURACIÓN
-# ─────────────────────────────────────────────
 
-# Nombre del modelo tal como aparece en Ollama.
-# Verifica los disponibles con: ollama list
 MODELO = "nemotron:70b"
 
 REPETICIONES = 50
@@ -43,16 +38,12 @@ PARAMS = {
     "num_predict": 200,
 }
 
-# ─────────────────────────────────────────────
-# DIRECTORIO DE SALIDA (dentro de esta misma carpeta)
-# ─────────────────────────────────────────────
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
 out_dir  = os.path.join(base_dir, "dataset_experimento")
 os.makedirs(out_dir, exist_ok=True)
 
-# ─────────────────────────────────────────────
-# VERIFICACIÓN DE MODELO Y SERVIDOR
-# ─────────────────────────────────────────────
+
 def verificar_modelo():
     """Comprueba que Ollama esté corriendo y el modelo esté descargado."""
     try:
@@ -73,9 +64,7 @@ def verificar_modelo():
         print("  Asegúrate de que el servidor esté corriendo: ollama serve")
         sys.exit(1)
 
-# ─────────────────────────────────────────────
-# FUNCIONES
-# ─────────────────────────────────────────────
+
 def query_model(modelo: str, prompt: str) -> str:
     """Consulta el modelo vía Ollama y devuelve la respuesta como texto."""
     try:
@@ -101,9 +90,7 @@ def evaluar(texto: str) -> dict:
         "diversidad": round(diversidad, 4),
     }
 
-# ─────────────────────────────────────────────
-# EXPERIMENTO PRINCIPAL
-# ─────────────────────────────────────────────
+
 def ejecutar_experimento_sensibilidad():
     print(f"{'='*60}")
     print(f"EXPERIMENTO: SENSIBILIDAD EMOCIONAL DIRECTA — NEMOTRON 70B")
