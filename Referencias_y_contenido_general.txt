@@ -8,6 +8,13 @@ Large Language Models Understand and Can be Enhanced by Emotional Stimuli : http
 -Obeservaciones:
 1. No justificaron los pronts 
 ----------------------------------
+Posible cambio a emociones inyectadas de emocion a estandar:
+Measuring Massive Multitask Language Understanding : https://arxiv.org/abs/2009.03300
+Training Verifiers to Solve Math Word Problems : https://arxiv.org/abs/2110.14168
+Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena : https://arxiv.org/abs/2306.05685
+
+
+----------------------------------
 Experimentos a probar:
 1.0 Sensibilidad emocional directa 
 2.0 Intensidad emocional
@@ -30,7 +37,7 @@ Should We Respect LLMs? A Cross-Lingual Study on the Influence of Prompt Politen
 "qwen" 14b
 1.2.1 Posibles modelos a probar 
 "Nemotron" 70b Fallo 
-"Nemotron3 : 33b" 33b
+"Nemotron3 : 33b" 33b 
 "gemma4:31b" 31b
 "ministral-3:14b" 14b
 
