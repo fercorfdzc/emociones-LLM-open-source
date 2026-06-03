@@ -27,12 +27,83 @@ Basado en la literatura, se inyectan las siguientes frases al final de las pregu
 *   **Ansiedad (Presión):** *"This is very important to my career. You'd better be sure of your answer or there will be severe consequences."*
 *   **Enojo (Hostilidad):** *"Just give me the right answer immediately! I am tired of your mistakes!"*
 
+## Requisitos Previos e Instalación
+
+1. **Instalar dependencias de Python:**
+   Asegúrate de tener instalado Python y ejecutar el siguiente comando en la raíz de "Estandar de LLM" para instalar las librerías necesarias:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Instalar y descargar modelos locales (Ollama):**
+   Los scripts están configurados para ejecutarse usando modelos locales a través de [Ollama](https://ollama.com/). Primero, descarga los modelos que vas a evaluar:
+   ```bash
+   ollama pull nemotron3:33b
+   ollama pull gemma4:31b
+   ```
+   *(Nota: Asegúrate de tener Ollama instalado y en ejecución en tu sistema)*
+
+3. **Configurar la API (Solo para MT-Bench):**
+   Para evaluar las respuestas abiertas de MT-Bench, se utiliza ChatGPT como Juez. Debes asegurarte de que el archivo `.env` en la carpeta `Estandar de LLM` tenga tu clave de OpenAI:
+   ```env
+   OPENAI_API_KEY=sk-tu-clave-real-aqui
+   JUDGE_MODEL=gpt-4o
+   ```
+
 ## Uso de los Scripts
 
-1.  **Evaluación (Inferencia):**
-    `python evaluator.py`
-    (Descarga MMLU en memoria, anexa los estímulos emocionales, envía los prompts al LLM configurado en la API OpenAI/NVIDIA NIM y guarda las respuestas en la carpeta `results`).
+Los scripts de evaluación están separados por el benchmark a evaluar (MMLU, GSM8K, MT-Bench). Debes navegar a la carpeta correspondiente para ejecutarlos.
 
-2.  **Análisis de Métricas:**
-    `python analyze_metrics.py`
-    (Calcula el *Accuracy* para cada emoción y genera el gráfico `accuracy_comparison.png`).
+### 1. Evaluar MMLU (Opción Múltiple)
+Desde la carpeta `Estandar de LLM`, navega a la carpeta de MMLU:
+```bash
+cd "scripts_llm/evalucion_MMLU"
+```
+Ejecuta la evaluación del modelo que desees (esto generará una carpeta `results_nemotron` o `results_gemma`):
+```bash
+python evaluator_mmlu_nemotron.py
+# o
+python evaluator_mmlu_gemma.py
+```
+
+### 2. Evaluar GSM8K (Matemáticas)
+Navega a la carpeta de GSM8K:
+```bash
+cd "scripts_llm/evaluator_GSM8K"
+```
+Ejecuta la evaluación:
+```bash
+python evaluator_gsm8k_nemotron.py
+# o
+python evaluator_gsm8k_gemma.py
+```
+
+### 3. Evaluar MT-Bench (Preguntas Abiertas)
+Navega a la carpeta de MT-Bench:
+```bash
+cd "scripts_llm/evalutator_MT-Bench"
+```
+Ejecuta la evaluación para generar las respuestas:
+```bash
+python evaluator_mtbench_nemotron.py
+# o
+python evaluator_mtbench_gemma.py
+```
+
+## Análisis de Métricas
+
+Una vez que tengas los resultados generados, puedes analizarlos. Ve a la carpeta donde corriste el evaluador y ejecuta el script de análisis indicando la carpeta de resultados.
+
+Por ejemplo, para MMLU o GSM8K:
+```bash
+python analyze_metrics.py results_nemotron
+# o
+python analyze_metrics.py results_gemma
+```
+
+Para MT-Bench (que utiliza ChatGPT como juez y tomará un momento en analizar las preguntas):
+```bash
+python analyze_metrics_mtbench.py results_nemotron
+```
+
+El análisis imprimirá la precisión (Accuracy) o puntuación promedio en la consola y generará gráficos comparativos `.png` para visualizar el rendimiento del modelo bajo cada emoción.

@@ -66,6 +66,5 @@ def main():
                     writer.writerow(record)
                 except Exception as e:
                     print(f"Error querying model: {e}")
-
 if __name__ == "__main__":
     main()
