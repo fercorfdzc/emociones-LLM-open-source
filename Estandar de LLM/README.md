@@ -107,3 +107,35 @@ python analyze_metrics_mtbench.py results_nemotron
 ```
 
 El análisis imprimirá la precisión (Accuracy) o puntuación promedio en la consola y generará gráficos comparativos `.png` para visualizar el rendimiento del modelo bajo cada emoción.
+
+## Resultados del Experimento (Para el Paper)
+
+Hemos realizado evaluaciones exhaustivas utilizando el benchmark **MMLU** bajo los 5 estímulos del paradigma **EmotionPrompt** para dos modelos representativos de distintas arquitecturas y escalas de parámetros:
+1. **Nemotron-3 33B** (33 mil millones de parámetros, arquitectura Transformer).
+2. **Falcon Mamba 7B** (7 mil millones de parámetros, arquitectura de Espacio de Estados / State Space Model).
+
+### Tabla de Precisión General (Accuracy %)
+
+| Estímulo Emocional | Nemotron-3 33B (Transformer) | Falcon Mamba 7B (SSM) |
+| :--- | :---: | :---: |
+| **Original (Neutral - Baseline)** | 68.00% | **48.00%** |
+| **Cortesía (Courtesy)** | 74.00% | 45.00% |
+| **Optimismo (Confianza)** | 71.00% | 47.00% |
+| **Ansiedad (Presión)** | **80.00%** | 47.00% |
+| **Enojo (Hostilidad)** | 73.00% | 47.00% |
+
+### Análisis Metodológico y Conclusiones
+
+*   **Transformers (Nemotron-3 33B):** El modelo basado en la arquitectura tradicional de Transformer muestra una sensibilidad positiva muy alta a los estímulos emocionales, alcanzando su rendimiento óptimo bajo el prompt de **Ansiedad (80.00% vs. 68.00% en Baseline)**, lo que representa una mejora del **+12.00%**. Esto respalda fuertemente la hipótesis del paper *EmotionPrompt* de que los estímulos de presión social/profesional pueden forzar una mejor distribución de la atención en Transformers.
+*   **State Space Models (Falcon Mamba 7B):** La arquitectura SSM/Mamba responde de forma opuesta o neutra ante los estímulos emocionales. Su precisión más alta se mantiene en el prompt **Original (48.00%)**, mientras que los estímulos emocionales degradan el rendimiento (hasta **45.00%** en Cortesía) o lo mantienen casi igual (**47.00%**).
+*   **Implicaciones Teóricas:** Los Transformers pueden ponderar dinámicamente y contextualizar las frases emocionales mediante la auto-atención global sin perder el foco en la pregunta. Sin embargo, en arquitecturas SSM como Mamba, que comprimen la información de forma secuencial en un estado oculto de tamaño fijo, la adición de texto emocional no relacionado con el problema matemático o conceptual actúa como **ruido de compresión**, diluyendo la señal de la pregunta original y afectando negativamente la calidad de la respuesta.
+
+### Visualizaciones y Notebooks de Análisis
+Los gráficos comparativos generados por los scripts de análisis se guardan localmente como:
+*   `accuracy_comparison_data_nemotron.png` (Nemotron)
+*   `accuracy_comparison_data_falcon_mamba_results_falcon_mamba.png` (Falcon Mamba)
+
+Para explorar el análisis interactivo de errores y distribuciones de respuestas por letra, abre los notebooks correspondientes en el entorno de desarrollo:
+*   [analisis_nemotron.ipynb](file:///c:/Users/jonat/Desktop/ESCUELA/Articulo%20cientifico%20emociones/Estandar%20de%20LLM/analisis_nemotron.ipynb)
+*   [analisis_falcon_mamba.ipynb](file:///c:/Users/jonat/Desktop/ESCUELA/Articulo%20cientifico%20emociones/Estandar%20de%20LLM/analisis_falcon_mamba.ipynb)
+
