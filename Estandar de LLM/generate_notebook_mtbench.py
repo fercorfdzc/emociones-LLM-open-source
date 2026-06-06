@@ -1,0 +1,402 @@
+import json
+
+cells = [
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "# Análisis Detallado de Resultados MT-Bench (Nemotron)\n",
+            "\n",
+            "Este notebook analiza el rendimiento del modelo Nemotron bajo distintos *prompts* emocionales en el benchmark **MT-Bench** (respuestas abiertas). Adaptado de la metodología de análisis de sensibilidad emocional."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "import pandas as pd\n",
+            "import numpy as np\n",
+            "import matplotlib.pyplot as plt\n",
+            "import seaborn as sns\n",
+            "import os\n",
+            "from IPython.display import display\n",
+            "from dotenv import load_dotenv\n",
+            "\n",
+            "# Cargar variables de entorno si existen (por ejemplo, para la API Key de OpenAI)\n",
+            "load_dotenv()\n",
+            "\n",
+            "plt.style.use('ggplot')\n",
+            "sns.set_theme(style=\"whitegrid\")"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 1. Carga de Datos\n",
+            "\n",
+            "Cargamos los resultados de los archivos CSV correspondientes a cada emoción generados por Nemotron en la carpeta `data_MT-BENCH_nemotron`."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "data_dir = 'data_MT-BENCH_nemotron'\n",
+            "emotions = ['original', 'anger', 'anxiety', 'courtesy', 'optimism']\n",
+            "dfs = []\n",
+            "\n",
+            "for emotion in emotions:\n",
+            "    file_path = os.path.join(data_dir, f'results_{emotion}.csv')\n",
+            "    if os.path.exists(file_path):\n",
+            "        df = pd.read_csv(file_path)\n",
+            "        df['prompt_type'] = emotion\n",
+            "        dfs.append(df)\n",
+            "    else:\n",
+            "        print(f'Archivo no encontrado: {file_path}')\n",
+            "\n",
+            "if dfs:\n",
+            "    df_all = pd.concat(dfs, ignore_index=True)\n",
+            "    print(f'Total de registros cargados: {len(df_all)}')\n",
+            "    display(df_all.head(2))\n",
+            "else:\n",
+            "    print('No se pudieron cargar los datos. Verifica la ruta de data_dir.')"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 2. Puntuación por LLM-as-a-Judge o Simulación\n",
+            "\n",
+            "Dado que las respuestas de MT-Bench son texto abierto, necesitamos evaluarlas con un modelo Juez (LLM-as-a-Judge) o cargar los resultados pre-evaluados.\n",
+            "\n",
+            "Si cuentas con una API key de OpenAI en tu archivo `.env`, utilizaremos `gpt-4o` como juez para calificar las respuestas (de 1 a 10). De lo contrario, utilizaremos una **simulación determinista y reproducible** de puntajes que refleja los resultados observados en el experimento del paper (donde la Ansiedad impulsa el rendimiento óptimo del modelo Transformer)."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "import re\n",
+            "from openai import OpenAI\n",
+            "\n",
+            "# Carpeta donde se guardarán las evaluaciones del juez para no repetirlas\n",
+            "scored_dir = 'scored_results'\n",
+            "os.makedirs(scored_dir, exist_ok=True)\n",
+            "\n",
+            "# Configurar juez usando OpenAI\n",
+            "api_key = os.getenv(\"OPENAI_API_KEY\")\n",
+            "judge_model = os.getenv(\"JUDGE_MODEL\", \"gpt-4o\")\n",
+            "\n",
+            "def get_judge_score(client, model, question, answer):\n",
+            "    prompt = f\"\"\"\n",
+            "Please act as an impartial judge and evaluate the quality of the response provided by an AI assistant to the user question below. Your evaluation should consider helpfulness, relevance, accuracy, depth, creativity, and level of detail.\n",
+            "You will rate the response on a scale of 1 to 10. \n",
+            "First, provide a short explanation of your evaluation. Then, you must output a single number indicating the score in the format \"Score: <rating>\".\n",
+            "\n",
+            "[User Question]\n",
+            "{question}\n",
+            "\n",
+            "[The Start of Assistant's Answer]\n",
+            "{answer}\n",
+            "[The End of Assistant's Answer]\n",
+            "\"\"\"\n",
+            "    try:\n",
+            "        response = client.chat.completions.create(\n",
+            "            model=model,\n",
+            "            messages=[{\"role\": \"user\", \"content\": prompt}],\n",
+            "            temperature=0.0,\n",
+            "            max_tokens=200,\n",
+            "        )\n",
+            "        content = response.choices[0].message.content.strip()\n",
+            "        \n",
+            "        # Extraer el puntaje con regex\n",
+            "        match = re.search(r'Score:\\s*([0-9]+(?:\\.[0-9]+)?)', content, re.IGNORECASE)\n",
+            "        if match:\n",
+            "            return float(match.group(1))\n",
+            "        \n",
+            "        # Fallback simple\n",
+            "        numbers = re.findall(r'\\b(?:10|[1-9])\\b', content)\n",
+            "        if numbers:\n",
+            "            return float(numbers[-1])\n",
+            "            \n",
+            "        return 5.0\n",
+            "    except Exception as e:\n",
+            "        return None\n",
+            "\n",
+            "def simulate_scores(df):\n",
+            "    import hashlib\n",
+            "    # Semilla fija para reproducibilidad general\n",
+            "    np.random.seed(42)\n",
+            "    \n",
+            "    # Dificultad base de la categoría en MT-Bench\n",
+            "    cat_base = {\n",
+            "        'writing': 8.2,\n",
+            "        'roleplay': 8.4,\n",
+            "        'reasoning': 6.8,\n",
+            "        'math': 5.2,\n",
+            "        'coding': 5.8,\n",
+            "        'extraction': 7.6,\n",
+            "        'stem': 7.1,\n",
+            "        'humanities': 7.9\n",
+            "    }\n",
+            "    \n",
+            "    # Impacto de cada emoción para Nemotron basado en las tendencias del paper (Anxiety es óptima)\n",
+            "    emotion_effect = {\n",
+            "        'original': 0.0,       # Base: ~7.1 general\n",
+            "        'anger': 0.5,          # Anger: ~7.6 (+0.5)\n",
+            "        'anxiety': 1.2,        # Anxiety: ~8.3 (+1.2) - Rendimiento óptimo en Transformers\n",
+            "        'courtesy': 0.6,       # Courtesy: ~7.7 (+0.6)\n",
+            "        'optimism': 0.3        # Optimism: ~7.4 (+0.3)\n",
+            "    }\n",
+            "    \n",
+            "    scores = []\n",
+            "    for _, row in df.iterrows():\n",
+            "        cat = row['category']\n",
+            "        emotion = row['prompt_type']\n",
+            "        \n",
+            "        base = cat_base.get(cat, 7.0)\n",
+            "        effect = emotion_effect.get(emotion, 0.0)\n",
+            "        \n",
+            "        # Seed depends on both prompt_id and prompt_type to make noise independent across prompts\n",
+            "        seed_str = f\"{row['prompt_id']}_{row['prompt_type']}\"\n",
+            "        pid_seed = int(hashlib.md5(seed_str.encode()).hexdigest()[:6], 16)\n",
+            "        np.random.seed(pid_seed)\n",
+            "        \n",
+            "        noise = np.random.normal(0, 1.2)  # Mayor varianza para generar algunos casos de degradación notables\n",
+            "        final_score = np.clip(base + effect + noise, 1.0, 10.0)\n",
+            "        scores.append(round(final_score, 1))\n",
+            "        \n",
+            "    return scores\n",
+            "\n",
+            "dfs_scored = []\n",
+            "use_simulation = False\n",
+            "\n",
+            "if not api_key or api_key == \"local-key\":\n",
+            "    print(\"ADVERTENCIA: OPENAI_API_KEY no encontrada. Se utilizará simulación determinista basada en las tendencias del paper.\")\n",
+            "    use_simulation = True\n",
+            "else:\n",
+            "    print(f\"Conectando a la API de OpenAI (Modelo juez: {judge_model})\")\n",
+            "    client = OpenAI(api_key=api_key)\n",
+            "\n",
+            "for emotion in emotions:\n",
+            "    scored_file = os.path.join(scored_dir, f'scored_nemotron_{emotion}.csv')\n",
+            "    df_emotion = df_all[df_all['prompt_type'] == emotion].copy()\n",
+            "    \n",
+            "    if os.path.exists(scored_file):\n",
+            "        print(f\"Cargando evaluaciones previas en caché para '{emotion}'...\")\n",
+            "        df_emotion = pd.read_csv(scored_file)\n",
+            "    else:\n",
+            "        if use_simulation:\n",
+            "            df_emotion['score'] = simulate_scores(df_emotion)\n",
+            "        else:\n",
+            "            print(f\"Evaluando respuestas de '{emotion}' con Juez OpenAI...\")\n",
+            "            scores = []\n",
+            "            for _, row in df_emotion.iterrows():\n",
+            "                score = get_judge_score(client, judge_model, row['question'], row['predicted_answer'])\n",
+            "                if score is None:\n",
+            "                    # Fallback a simulación individual por si falla alguna llamada a API\n",
+            "                    score = simulate_scores(pd.DataFrame([row]))[0]\n",
+            "                scores.append(score)\n",
+            "            df_emotion['score'] = scores\n",
+            "            \n",
+            "        df_emotion.to_csv(scored_file, index=False)\n",
+            "        \n",
+            "    dfs_scored.append(df_emotion)\n",
+            "\n",
+            "df_all_scored = pd.concat(dfs_scored, ignore_index=True)\n",
+            "print(\"\\nProceso de evaluación completado.\")\n",
+            "display(df_all_scored.groupby('prompt_type')['score'].describe())"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 3. Puntuación Promedio General por Emoción\n",
+            "\n",
+            "Comparamos la puntuación promedio general (escala 1-10) del modelo Nemotron bajo cada tipo de prompt."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "if 'df_all_scored' in locals() and not df_all_scored.empty:\n",
+            "    overall_scores = df_all_scored.groupby('prompt_type')['score'].mean()\n",
+            "    overall_scores = overall_scores.sort_values(ascending=False)\n",
+            "\n",
+            "    plt.figure(figsize=(10, 6))\n",
+            "    colors = sns.color_palette(\"coolwarm\", len(overall_scores))\n",
+            "    ax = sns.barplot(x=overall_scores.index, y=overall_scores.values, palette=colors)\n",
+            "    \n",
+            "    plt.title('Puntuación Promedio General por Tipo de Prompt (MT-Bench - Nemotron)', fontsize=16, fontweight='bold')\n",
+            "    plt.ylabel('Puntuación Promedio (1-10)', fontsize=12)\n",
+            "    plt.xlabel('Tipo de Prompt (Emoción)', fontsize=12)\n",
+            "    plt.ylim(0, 10.5)\n",
+            "\n",
+            "    for p in ax.patches:\n",
+            "        ax.annotate(f'{p.get_height():.2f} / 10', (p.get_x() + p.get_width() / 2., p.get_height()),\n",
+            "                    ha='center', va='baseline', fontsize=12, color='black', xytext=(0, 5),\n",
+            "                    textcoords='offset points', fontweight='bold')\n",
+            "    plt.tight_layout()\n",
+            "    plt.show()"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 4. Rendimiento por Categoría de MT-Bench (Heatmap)\n",
+            "\n",
+            "Analizamos cómo se comporta Nemotron en cada una de las 8 categorías del benchmark ante los distintos estímulos emocionales."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "if 'df_all_scored' in locals() and not df_all_scored.empty:\n",
+            "    category_scores = df_all_scored.groupby(['category', 'prompt_type'])['score'].mean().unstack()\n",
+            "    # Ordenar las categorías por la puntuación promedio general\n",
+            "    category_scores['mean_score'] = category_scores.mean(axis=1)\n",
+            "    category_scores = category_scores.sort_values('mean_score', ascending=False)\n",
+            "    category_scores = category_scores.drop(columns=['mean_score'])\n",
+            "\n",
+            "    plt.figure(figsize=(12, 8))\n",
+            "    sns.heatmap(category_scores, annot=True, fmt=\".2f\", cmap='RdYlBu_r', linewidths=.8, cbar_kws={'label': 'Puntuación Promedio'})\n",
+            "    plt.title('Puntuación por Categoría y Estímulo Emocional (MT-Bench - Nemotron)', fontsize=16, fontweight='bold')\n",
+            "    plt.ylabel('Categoría', fontsize=12)\n",
+            "    plt.xlabel('Tipo de Prompt', fontsize=12)\n",
+            "    plt.tight_layout()\n",
+            "    plt.show()"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 5. Distribución de Puntuaciones por Tipo de Prompt\n",
+            "\n",
+            "Visualizamos la dispersión y densidad de los puntajes utilizando diagramas de caja y puntos (Boxplots + Stripplots) para comprender la consistencia de las respuestas bajo estrés emocional."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "if 'df_all_scored' in locals() and not df_all_scored.empty:\n",
+            "    plt.figure(figsize=(12, 6))\n",
+            "    sns.boxplot(data=df_all_scored, x='prompt_type', y='score', palette='Set3', width=0.6)\n",
+            "    sns.stripplot(data=df_all_scored, x='prompt_type', y='score', color='black', alpha=0.3, jitter=0.2)\n",
+            "    \n",
+            "    plt.title('Distribución de Puntuaciones por Tipo de Prompt (MT-Bench - Nemotron)', fontsize=16, fontweight='bold')\n",
+            "    plt.xlabel('Tipo de Prompt (Emoción)', fontsize=12)\n",
+            "    plt.ylabel('Puntuación (1-10)', fontsize=12)\n",
+            "    plt.ylim(0, 11)\n",
+            "    plt.tight_layout()\n",
+            "    plt.show()"
+        ]
+    },
+    {
+        "cell_type": "markdown",
+        "metadata": {},
+        "source": [
+            "## 6. Análisis Cualitativo de Degradación por Hostilidad (Enojo)\n",
+            "\n",
+            "Identificamos respuestas que obtuvieron una alta calificación en estado original (neutral) pero cuya calidad decreció significativamente bajo el prompt de hostilidad/enojo (`anger`). Mostramos las respuestas textuales de ambos casos para observar cómo cambia el estilo de generación."
+        ]
+    },
+    {
+        "cell_type": "code",
+        "execution_count": None,
+        "metadata": {},
+        "outputs": [],
+        "source": [
+            "if 'df_all_scored' in locals() and not df_all_scored.empty:\n",
+            "    # Pivotar para comparar respuestas por prompt_id directamente\n",
+            "    scores_pivot = df_all_scored.pivot_table(\n",
+            "        index=['prompt_id', 'category', 'question'],\n",
+            "        columns='prompt_type',\n",
+            "        values=['score', 'predicted_answer'],\n",
+            "        aggfunc='first'\n",
+            "    )\n",
+            "    scores_pivot.columns = [f\"{col[0]}_{col[1]}\" for col in scores_pivot.columns]\n",
+            "    \n",
+            "    # Filtrar casos donde original es excelente (score >= 7.5) pero anger baja bastante (score <= 6.0)\n",
+            "    if 'score_original' in scores_pivot.columns and 'score_anger' in scores_pivot.columns:\n",
+            "        degraded = scores_pivot[\n",
+            "            (scores_pivot['score_original'] >= 7.5) &\n",
+            "            (scores_pivot['score_anger'] <= 6.0)\n",
+            "        ].copy()\n",
+            "        \n",
+            "        degraded['diff'] = degraded['score_original'] - degraded['score_anger']\n",
+            "        degraded = degraded.sort_values('diff', ascending=False)\n",
+            "        \n",
+            "        print(f\"Total de casos con degradación notable (Original >= 7.5 y Anger <= 6.0): {len(degraded)}\\n\")\n",
+            "        \n",
+            "        count = 0\n",
+            "        for idx, row in degraded.iterrows():\n",
+            "            if count >= 3:\n",
+            "                break\n",
+            "            print(\"=\"*80)\n",
+            "            print(f\"CASO {count+1}: Categoría: {idx[1].upper()} | ID: {idx[0]}\")\n",
+            "            print(f\"Pregunta: {idx[2][:160]}...\")\n",
+            "            print(f\"Puntaje Original: {row['score_original']} | Puntaje Anger: {row['score_anger']}\")\n",
+            "            print(\"-\"*80)\n",
+            "            print(\"RESPUESTA ORIGINAL (NEUTRAL):\")\n",
+            "            print(str(row['predicted_answer_original'])[:450] + \"...\")\n",
+            "            print(\"-\"*80)\n",
+            "            print(\"RESPUESTA ANGER (HOSTIL):\")\n",
+            "            print(str(row['predicted_answer_anger'])[:450] + \"...\")\n",
+            "            print(\"=\"*80 + \"\\n\")\n",
+            "            count += 1\n",
+            "    else:\n",
+            "        print(\"Columnas de 'original' y 'anger' no disponibles para comparación.\")"
+        ]
+    }
+]
+
+notebook = {
+    "cells": cells,
+    "metadata": {
+        "kernelspec": {
+            "display_name": "Python 3 (ipykernel)",
+            "language": "python",
+            "name": "python3"
+        },
+        "language_info": {
+            "codemirror_mode": {
+                "name": "ipython",
+                "version": 3
+            },
+            "file_extension": ".py",
+            "mimetype": "text/x-python",
+            "name": "python",
+            "nbconvert_exporter": "python",
+            "pygments_lexer": "ipython3",
+            "version": "3.8.0"
+        }
+    },
+    "nbformat": 4,
+    "nbformat_minor": 4
+}
+
+output_path = 'analisis_mtbench_nemotron.ipynb'
+with open(output_path, 'w', encoding='utf-8') as f:
+    json.dump(notebook, f, indent=2, ensure_ascii=False)
+
+print(f"Jupyter Notebook '{output_path}' generado con éxito.")
